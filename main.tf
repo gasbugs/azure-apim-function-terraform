@@ -6,6 +6,12 @@ resource "random_string" "unique" {
   special = false
 }
 
+data "archive_file" "function_zip" {
+  type        = "zip"
+  source_dir  = "${path.module}/function_app"
+  output_path = "${path.module}/function_app.zip"
+}
+
 resource "azurerm_resource_group" "rg" {
   name     = "${var.prefix}-rg-${random_string.unique.result}"
   location = var.location
@@ -34,10 +40,11 @@ resource "azurerm_linux_function_app" "func" {
   service_plan_id             = azurerm_service_plan.plan.id
   storage_account_name        = azurerm_storage_account.sa.name
   storage_account_access_key  = azurerm_storage_account.sa.primary_access_key
+  zip_deploy_file             = data.archive_file.function_zip.output_path
 
   site_config {
     application_stack {
-      python_version = "3.9"
+      python_version = "3.8"
     }
   }
 }
@@ -76,7 +83,7 @@ resource "azurerm_api_management_api" "api" {
   display_name        = "Hello Python API"
   path                = "hello"
   protocols           = ["https"]
-  service_url         = "https://${azurerm_linux_function_app.func.default_hostname}/api/hello_world"
+
 }
 
 resource "azurerm_api_management_api_operation" "get" {
@@ -102,6 +109,8 @@ resource "azurerm_api_management_api_policy" "api_policy" {
 <policies>
   <inbound>
     <base />
+    <set-backend-service base-url="https://${azurerm_linux_function_app.func.default_hostname}" />
+    <rewrite-uri template="/api/hello_world" />
     <set-query-parameter name="code" exists-action="override">
       <value>{{function-key}}</value>
     </set-query-parameter>
