@@ -36,11 +36,11 @@ resource "azurerm_service_plan" "plan" {
 resource "azurerm_linux_function_app" "func" {
   name                       = "${var.prefix}-func-${random_string.unique.result}"
   location                   = azurerm_resource_group.rg.location
-  resource_group_name         = azurerm_resource_group.rg.name
-  service_plan_id             = azurerm_service_plan.plan.id
-  storage_account_name        = azurerm_storage_account.sa.name
-  storage_account_access_key  = azurerm_storage_account.sa.primary_access_key
-  zip_deploy_file             = data.archive_file.function_zip.output_path
+  resource_group_name        = azurerm_resource_group.rg.name
+  service_plan_id            = azurerm_service_plan.plan.id
+  storage_account_name       = azurerm_storage_account.sa.name
+  storage_account_access_key = azurerm_storage_account.sa.primary_access_key
+  zip_deploy_file            = data.archive_file.function_zip.output_path
 
   site_config {
     application_stack {
@@ -94,7 +94,7 @@ resource "azurerm_api_management_api_operation" "get" {
   display_name        = "Get Hello"
   method              = "GET"
   url_template        = "/"
-  
+
   response {
     status_code = 200
   }
@@ -139,16 +139,16 @@ resource "azurerm_api_management_product" "product" {
 }
 
 resource "azurerm_api_management_product_api" "product_api" {
-  product_id            = azurerm_api_management_product.product.product_id
-  api_name              = azurerm_api_management_api.api.name
-  api_management_name   = azurerm_api_management.apim.name
-  resource_group_name   = azurerm_resource_group.rg.name
+  product_id          = azurerm_api_management_product.product.product_id
+  api_name            = azurerm_api_management_api.api.name
+  api_management_name = azurerm_api_management.apim.name
+  resource_group_name = azurerm_resource_group.rg.name
 }
 
 resource "azurerm_api_management_subscription" "sub" {
-  api_management_name   = azurerm_api_management.apim.name
-  resource_group_name   = azurerm_resource_group.rg.name
-  product_id            = azurerm_api_management_product.product.id
-  display_name          = "test-sub"
-  primary_key           = null
+  api_management_name = azurerm_api_management.apim.name
+  resource_group_name = azurerm_resource_group.rg.name
+  product_id          = azurerm_api_management_product.product.id
+  display_name        = "test-sub"
+  primary_key         = null
 }
