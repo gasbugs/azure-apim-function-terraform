@@ -6,10 +6,14 @@ resource "random_string" "unique" {
   special = false
 }
 
+locals {
+  source_hash = md5(join("", [for f in fileset("${path.module}/function_app", "**") : filemd5("${path.module}/function_app/${f}")]))
+}
+
 data "archive_file" "function_zip" {
   type        = "zip"
   source_dir  = "${path.module}/function_app"
-  output_path = "${path.module}/function_app.zip"
+  output_path = "${path.module}/.terraform/function_app_${local.source_hash}.zip"
 }
 
 resource "azurerm_resource_group" "rg" {
@@ -41,6 +45,10 @@ resource "azurerm_linux_function_app" "func" {
   storage_account_name       = azurerm_storage_account.sa.name
   storage_account_access_key = azurerm_storage_account.sa.primary_access_key
   zip_deploy_file            = data.archive_file.function_zip.output_path
+
+  app_settings = {
+    "HASH" = data.archive_file.function_zip.output_base64sha256
+  }
 
   site_config {
     application_stack {
@@ -145,10 +153,19 @@ resource "azurerm_api_management_product_api" "product_api" {
   resource_group_name = azurerm_resource_group.rg.name
 }
 
+resource "random_password" "sub_key" {
+  length  = 32
+  special = false
+  lower   = true
+  upper   = true
+  numeric = true
+}
+
 resource "azurerm_api_management_subscription" "sub" {
   api_management_name = azurerm_api_management.apim.name
   resource_group_name = azurerm_resource_group.rg.name
   product_id          = azurerm_api_management_product.product.id
   display_name        = "test-sub"
-  primary_key         = null
+  primary_key         = random_password.sub_key.result
+  state               = "active"
 }

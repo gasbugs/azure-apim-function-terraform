@@ -1,4 +1,4 @@
-# Terraform-specific files
+# Terraform
 .terraform/
 .terraform.lock.hcl
 *.tfstate
@@ -11,6 +11,21 @@ override.tf.json
 *_override.tf.json
 *.tfvars
 *.tfvars.json
+*.tfplan
 
-# Build artifacts
+# Mac OS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+
+# Build artifacts & Azure Functions
+function_app.zip
 hello_function.zip
+.azurefunctions/
+local.settings.json
