@@ -1,6 +1,5 @@
 # Terraform
 .terraform/
-.terraform.lock.hcl
 *.tfstate
 *.tfstate.backup
 crash.log
@@ -29,3 +28,6 @@ function_app.zip
 hello_function.zip
 .azurefunctions/
 local.settings.json
+
+# One-off policy payload for the existing Azure deployment
+/apim-policy.json

@@ -7,13 +7,27 @@ resource "random_string" "unique" {
 }
 
 locals {
-  source_hash = md5(join("", [for f in fileset("${path.module}/function_app", "**") : filemd5("${path.module}/function_app/${f}")]))
+  # Package only deployable sources, never local settings, caches or virtualenvs.
+  function_files = setunion(
+    fileset("${path.module}/function_app", "*.json"),
+    fileset("${path.module}/function_app", "requirements.txt"),
+    fileset("${path.module}/function_app", "hello_world/*.py"),
+    fileset("${path.module}/function_app", "hello_world/function.json")
+  )
+  deploy_files = setsubtract(local.function_files, toset(["local.settings.json"]))
+  source_hash  = md5(join("", [for f in sort(tolist(local.deploy_files)) : "${f}:${filemd5("${path.module}/function_app/${f}")}"]))
 }
 
 data "archive_file" "function_zip" {
   type        = "zip"
-  source_dir  = "${path.module}/function_app"
   output_path = "${path.module}/.terraform/function_app_${local.source_hash}.zip"
+  dynamic "source" {
+    for_each = local.deploy_files
+    content {
+      content  = file("${path.module}/function_app/${source.value}")
+      filename = source.value
+    }
+  }
 }
 
 resource "azurerm_resource_group" "rg" {
@@ -47,7 +61,10 @@ resource "azurerm_linux_function_app" "func" {
   zip_deploy_file            = data.archive_file.function_zip.output_path
 
   app_settings = {
-    "HASH" = data.archive_file.function_zip.output_base64sha256
+    "HASH"                           = data.archive_file.function_zip.output_base64sha256
+    "FUNCTIONS_WORKER_RUNTIME"       = "python"
+    "SCM_DO_BUILD_DURING_DEPLOYMENT" = "true"
+    "ENABLE_ORYX_BUILD"              = "true"
   }
 
   site_config {
@@ -119,9 +136,9 @@ resource "azurerm_api_management_api_policy" "api_policy" {
     <base />
     <set-backend-service base-url="https://${azurerm_linux_function_app.func.default_hostname}" />
     <rewrite-uri template="/api/hello_world" />
-    <set-query-parameter name="code" exists-action="override">
-      <value>{{function-key}}</value>
-    </set-query-parameter>
+    <set-header name="x-functions-key" exists-action="override">
+      <value>{{${azurerm_api_management_named_value.function_key.display_name}}}</value>
+    </set-header>
   </inbound>
   <backend>
     <base />

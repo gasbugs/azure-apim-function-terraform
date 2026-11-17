@@ -80,9 +80,17 @@ Azure Function 코드는 `function_app/` 디렉토리 아래에 위치하며 루
    ```
    API 엔드포인트 테스트는 아래와 같이 진행합니다:
    ```bash
-   curl "$(terraform output -raw function_endpoint)"
+   curl --get "$(terraform output -raw api_endpoint)" \
+     --data-urlencode "name=홍길동" \
+     -H "Ocp-Apim-Subscription-Key: $(terraform output -raw subscription_key)"
    ```
-   URL 및 민감한 정보(구독 키 등)는 외부에 유출되지 않도록 안전하게 관리하세요.
+   위 예시는 Bash용입니다. PowerShell에서는 다음과 같이 실행하세요:
+   ```powershell
+   $endpoint = terraform output -raw api_endpoint
+   $key = terraform output -raw subscription_key
+   Invoke-RestMethod -Uri ($endpoint + '?name=' + [uri]::EscapeDataString('홍길동')) -Headers @{'Ocp-Apim-Subscription-Key' = $key}
+   ```
+   구독 키를 포함하는 기존 `function_endpoint`, `test_curl_command` 출력은 호환성을 위해 유지하되 모두 sensitive 처리합니다. 키와 Terraform 상태/계획 파일을 공유하지 마세요.
 
 7. **인프라 삭제(Destroy):**
    이 프로젝트에서 생성한 모든 리소스를 완전히 삭제하려면 다음 명령어를 실행합니다:
@@ -91,6 +99,18 @@ Azure Function 코드는 `function_app/` 디렉토리 아래에 위치하며 루
    ```
 
 ## 개발 및 테스트 가이드라인
+
+- Python 3.12와 Azure Functions Core Tools v4를 사용하세요. 저장소 루트에서 가상환경을 만들고 `python -m pip install -r function_app/requirements.txt`로 의존성을 설치한 뒤 `python -m unittest discover -s tests -v`를 실행하세요.
+- 로컬 실행 시 `function_app/local.settings.json`을 생성하세요(커밋/배포 제외):
+  ```json
+  {"IsEncrypted": false, "Values": {"FUNCTIONS_WORKER_RUNTIME": "python", "AzureWebJobsStorage": "UseDevelopmentStorage=true"}}
+  ```
+  이 설정을 사용하려면 Azurite를 먼저 실행하세요. 이후 `func start --script-root function_app`으로 시작하고 `http://localhost:7071/api/hello_world?name=Azure`를 호출합니다.
+- ZIP 배포에는 `requirements.txt`와 원격 빌드 설정(`SCM_DO_BUILD_DURING_DEPLOYMENT`, `ENABLE_ORYX_BUILD`)이 필요합니다. 현재 구성은 소스만 압축하고 Azure에서 의존성을 설치합니다. `WEBSITE_RUN_FROM_PACKAGE=1`을 별도로 추가하지 마세요.
+- APIM 정책은 Named Value의 **display_name**을 참조해야 합니다. Terraform 리소스 참조로 이름과 생성 순서를 연결했으므로 `{{function-key}}` 같은 별도 문자열로 되돌리지 마세요.
+- APIM을 통한 경로는 `/hello/`이며 GET을 지원합니다. 함수 직접 경로 `/api/hello_world`는 GET/POST를 지원하지만 Azure에서 직접 호출할 때 함수 키가 필요합니다.
+- 이 저장소의 `Developer_1` APIM은 유료이며 생성에 시간이 걸립니다. 새 복제본에는 기존 Terraform 상태가 없으므로 기존 배포를 수정하려면 원래 상태/백엔드를 사용하세요. 새 복제본에서 바로 apply하면 별도 리소스를 생성할 수 있습니다.
+- `.terraform.lock.hcl`을 버전 관리하여 검증한 provider 조합을 재사용하세요.
 
 - **로컬에서 함수 실행하기**: 변경 사항을 커밋하기 전에 로컬에서 `func start --script-root function_app` 명령어로 함수 로직을 실행하여 테스트하세요.
 - **Python 코딩 컨벤션**: Python 코드는 PEP 8(들여쓰기 4칸, 명확한 식별자 이름, 응답 시 f-string 사용)을 따릅니다. Azure Functions 시그니처 `main(req: func.HttpRequest) -> func.HttpResponse`는 수정하지 말고 그대로 유지하세요.

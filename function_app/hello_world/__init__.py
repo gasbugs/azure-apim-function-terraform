@@ -7,7 +7,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
             req_body = req.get_json()
         except ValueError:
             req_body = {}
-        name = req_body.get('name')
+        name = req_body.get('name') if isinstance(req_body, dict) else None
     if name:
         return func.HttpResponse(f"Hello, {name}!")
     else:
